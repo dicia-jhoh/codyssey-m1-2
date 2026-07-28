@@ -1,0 +1,17 @@
+# 백엔드 — FastAPI 스택
+fastapi>=0.110
+uvicorn[standard]>=0.29
+
+# 요청 검증 (FastAPI 가 의존하지만 버전을 명시해 둔다)
+pydantic>=2.6
+
+# Firestore. 서비스 계정 키가 없으면 코드가 로컬 저장소로 자동 전환하므로,
+# 설치만 해 두고 키 없이도 서버는 뜬다.
+firebase-admin>=6.5
+
+# GPT 호출
+openai>=1.30
+
+# .env 로더 — 이 프로젝트는 backend/config.py 에 직접 구현했지만,
+# 미션이 요구한 패키지라 함께 명시한다.
+python-dotenv>=1.0

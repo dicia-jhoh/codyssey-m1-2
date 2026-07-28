@@ -1,0 +1,14 @@
+# 실제 키 — 절대 커밋하지 않는다
+.env
+.env.local
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
+# 로컬 저장소(생성물)
+data/local_store/
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store

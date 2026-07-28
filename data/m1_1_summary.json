@@ -1,0 +1,55 @@
+{
+  "dataset": "Airline Passengers (Box & Jenkins)",
+  "period": "1949-01 ~ 1960-12",
+  "points": 144,
+  "unit": "천 명(월간 탑승객 수)",
+  "stats": {
+    "min": 104.0,
+    "max": 622.0,
+    "mean": 280.3,
+    "median": 265.5,
+    "stdev": 120.0
+  },
+  "growth": {
+    "first_year_total": 1520,
+    "last_year_total": 5714,
+    "total_growth_pct": 275.9,
+    "avg_yoy_pct": 12.9
+  },
+  "seasonality": {
+    "peak_month": 8,
+    "peak_index": 1.237,
+    "low_month": 11,
+    "low_index": 0.832,
+    "monthly_index": {
+      "1": 0.861,
+      "2": 0.852,
+      "3": 0.98,
+      "4": 0.959,
+      "5": 0.966,
+      "6": 1.103,
+      "7": 1.236,
+      "8": 1.237,
+      "9": 1.081,
+      "10": 0.951,
+      "11": 0.832,
+      "12": 0.942
+    }
+  },
+  "volatility": {
+    "first_year_cv": 10.8,
+    "last_year_cv": 16.3
+  },
+  "forecast_baseline": {
+    "method": "seasonal naive × growth",
+    "horizon": 12,
+    "mape": 2.95,
+    "mae": 13.4,
+    "bias": 5.4
+  },
+  "quality": {
+    "empty_rows": 0,
+    "missing_months": [],
+    "outliers": []
+  }
+}
