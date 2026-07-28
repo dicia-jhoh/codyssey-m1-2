@@ -228,6 +228,282 @@ POST /api/chat  {"message": "추세가 어때?", "conversation_id": null}
 **자동 저장을 이 엔드포인트에 둔 이유**: 사용자가 "저장" 버튼을 누르기를 기다리면 대부분
 저장되지 않습니다. 대화는 **일어난 사실**이므로 그 자리에서 남기는 편이 맞습니다.
 
+### 구현 코드
+
+#### 데이터 CRUD — `backend/routers/data.py`
+
+생성은 201, 수정·삭제는 대상이 없으면 404 를 돌려줍니다. 검증은 Pydantic 이 함수에
+들어오기 **전에** 끝냅니다.
+
+```python
+@router.post("", response_model=DataPointOut, status_code=status.HTTP_201_CREATED,
+             summary="새 데이터 추가")
+def create_data(payload: DataPointIn) -> DataPointOut:
+    """데이터 1건을 추가한다. 검증은 Pydantic 이 이 함수에 들어오기 전에 끝낸다."""
+    record = db.get_repository().add(db.COLLECTION_DATA, payload.model_dump())
+    return DataPointOut(**_normalize(record))
+
+
+@router.put("/{data_id}", response_model=DataPointOut, summary="데이터 수정")
+def update_data(data_id: str, payload: DataPointIn) -> DataPointOut:
+    """데이터 1건을 수정한다. 없으면 404."""
+    record = db.get_repository().update(db.COLLECTION_DATA, data_id, payload.model_dump())
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"데이터를 찾을 수 없습니다: {data_id}")
+    return DataPointOut(**_normalize(record))
+
+
+@router.delete("/{data_id}", status_code=status.HTTP_204_NO_CONTENT, summary="데이터 삭제")
+def delete_data(data_id: str) -> None:
+    """데이터 1건을 삭제한다. 없으면 404.
+
+    204(No Content)를 쓰는 이유: 삭제 성공에는 돌려줄 내용이 없다. 200 에 빈 객체를
+    넣는 것보다 의미가 분명하다.
+    """
+    if not db.get_repository().delete(db.COLLECTION_DATA, data_id):
+        raise HTTPException(status_code=404, detail=f"데이터를 찾을 수 없습니다: {data_id}")
+```
+
+요약 엔드포인트가 AI 로 들어가는 값을 만듭니다.
+
+```python
+@router.get("/summary", response_model=SummaryOut, summary="데이터 요약(프롬프트 주입용)")
+def get_summary() -> SummaryOut:
+    documents = db.get_repository().list(db.COLLECTION_DATA)
+    return SummaryOut(**summary_service.compute_summary(documents))
+```
+
+실제 동작 로그입니다.
+
+```text
+$ curl -X POST localhost:8000/api/data -H 'Content-Type: application/json' \
+    -d '{"period":"1961-01","value":450,"note":"테스트 추가"}'
+{"period":"1961-01","value":450.0,"note":"테스트 추가","id":"d65b477ac9ad480dba17", ...}
+
+$ curl -X PUT localhost:8000/api/data/d65b477ac9ad480dba17 -H 'Content-Type: application/json' \
+    -d '{"period":"1961-01","value":455,"note":"수정됨"}'
+{"period":"1961-01","value":455.0,"note":"수정됨","id":"d65b477ac9ad480dba17", ...}
+
+$ curl -X DELETE localhost:8000/api/data/d65b477ac9ad480dba17 -o /dev/null -w "%{http_code}"
+204
+
+$ curl -X DELETE localhost:8000/api/data/nonexistent
+{"detail":"데이터를 찾을 수 없습니다: nonexistent"}   [HTTP 404]
+```
+
+#### 대화 — `backend/routers/conversations.py`
+
+목록은 `messages` 를 비우고 상세는 채웁니다. 그 차이가 `_to_out` 의 인자 하나입니다.
+
+```python
+@router.get("", response_model=list[ConversationOut], summary="대화 목록 조회")
+def list_conversations() -> list[ConversationOut]:
+    """대화 목록. **messages 는 비워서 돌려준다**(응답 크기 관리 — 미션 (B) 방식)."""
+    documents = db.get_repository().list(db.COLLECTION_CONVERSATIONS)
+    return [_to_out(d, include_messages=False) for d in documents]
+
+
+@router.get("/{conversation_id}", response_model=ConversationOut, summary="대화 상세 조회")
+def get_conversation(conversation_id: str) -> ConversationOut:
+    """대화 1건의 **전체 messages** 를 돌려준다(미션 (A) 방식 — 불러오기 UX)."""
+    document = db.get_repository().get(db.COLLECTION_CONVERSATIONS, conversation_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail=f"대화를 찾을 수 없습니다: {conversation_id}")
+    return _to_out(document, include_messages=True)
+
+
+@router.post("", response_model=ConversationOut, status_code=status.HTTP_201_CREATED,
+             summary="대화 저장")
+def create_conversation(payload: ConversationIn) -> ConversationOut:
+    """대화를 저장한다. `/api/chat` 이 자동으로 부르지만, 직접 부를 수도 있다."""
+    record = db.get_repository().add(db.COLLECTION_CONVERSATIONS, {
+        "title": payload.title,
+        "messages": [m.model_dump() for m in payload.messages],
+    })
+    return _to_out(record, include_messages=True)
+
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT,
+               summary="대화 삭제")
+def delete_conversation(conversation_id: str) -> None:
+    """대화 1건을 삭제한다. 없으면 404."""
+    if not db.get_repository().delete(db.COLLECTION_CONVERSATIONS, conversation_id):
+        raise HTTPException(status_code=404, detail=f"대화를 찾을 수 없습니다: {conversation_id}")
+```
+
+목록과 상세의 응답 차이를 실제로 확인한 로그입니다.
+
+```text
+$ curl localhost:8000/api/conversations
+[{"id":"f5924dd93ff04ca6bfb3","title":"추세 문의","message_count":2,"messages":[]}]
+
+$ curl localhost:8000/api/conversations/f5924dd93ff04ca6bfb3
+{"id":"f5924dd93ff04ca6bfb3","title":"추세 문의","message_count":2,
+ "messages":[{"role":"user","content":"이 데이터 추세가 어때?"}, ...]}
+```
+
+#### AI 대화 — `backend/routers/chat.py`
+
+미션이 정한 4단계가 함수 하나에 순서대로 들어 있습니다.
+
+```python
+@router.post("", response_model=ChatOut, summary="AI 대화")
+def chat(payload: ChatIn) -> ChatOut:
+    """질문을 받아 데이터 요약을 넣고 GPT 에 묻는다. 대화는 자동 저장된다."""
+    repository = db.get_repository()
+    documents = repository.list(db.COLLECTION_DATA)
+
+    # ① 이어 갈 대화가 있으면 이전 메시지를 불러온다(맥락 유지)
+    history: list[dict] = []
+    conversation = None
+    if payload.conversation_id:
+        conversation = repository.get(db.COLLECTION_CONVERSATIONS, payload.conversation_id)
+        if conversation is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"대화를 찾을 수 없습니다: {payload.conversation_id}",
+            )
+        history = conversation.get("messages") or []
+
+    # ②③ 요약 주입 + GPT 호출
+    try:
+        reply, used_tools = ai_service.chat(payload.message, history, documents)
+    except ai_service.AIUnavailable as exc:
+        # 503 — 서버는 살아 있지만 외부 의존(AI)을 쓸 수 없다는 뜻
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # ④ 대화 저장 — 이어 가는 중이면 갱신, 새 대화면 생성
+    messages = [*history,
+                {"role": "user", "content": payload.message},
+                {"role": "assistant", "content": reply}]
+
+    if conversation:
+        repository.update(db.COLLECTION_CONVERSATIONS, conversation["id"],
+                          {"messages": messages})
+        conversation_id = conversation["id"]
+    else:
+        # 제목은 첫 질문에서 딴다 — 사용자가 목록에서 알아볼 수 있어야 한다
+        title = payload.message.strip().replace("\n", " ")[:TITLE_MAX]
+        record = repository.add(db.COLLECTION_CONVERSATIONS,
+                                {"title": title or "새 대화", "messages": messages})
+        conversation_id = record["id"]
+```
+
+#### GPT 호출 — `backend/services/ai.py`
+
+```python
+        try:
+            response = client.chat.completions.create(
+                model=config.DEFAULT_MODEL,
+                messages=messages,
+                tools=TOOL_SCHEMAS,
+                # 사실 기반 답변이라 낮게. 같은 데이터에 매번 다른 숫자가 나오면 안 된다.
+                temperature=0.2,
+                max_tokens=config.MAX_TOKENS,
+            )
+        except Exception as exc:  # noqa: BLE001 — SDK 예외 종류가 버전마다 다르다
+            logger.error("OpenAI 호출 실패: %s", exc)
+            raise AIUnavailable(f"AI 호출에 실패했습니다: {exc}") from exc
+
+        choice = response.choices[0].message
+        tool_calls = getattr(choice, "tool_calls", None)
+
+        if not tool_calls:
+            return (choice.content or "").strip(), used_tools
+```
+
+메시지를 조립하는 부분에 컨텍스트 주입과 이력 제한이 함께 들어 있습니다.
+
+```python
+    data_summary = summary_service.compute_summary(documents)
+    extended = summary_service.extended_statistics(documents)
+    system_prompt = summary_service.build_system_prompt(data_summary, extended)
+
+    messages: list[dict] = [{"role": "system", "content": system_prompt}]
+    # 이전 대화는 최근 것만 넣는다 — 전부 넣으면 토큰이 무한정 커진다
+    for entry in history[-10:]:
+        if entry.get("role") in ("user", "assistant") and entry.get("content"):
+            messages.append({"role": entry["role"], "content": entry["content"]})
+    messages.append({"role": "user", "content": user_message})
+```
+
+키가 없을 때는 **조용히 가짜 답을 만들지 않고** 503 과 안내를 돌려줍니다.
+
+```text
+$ curl -X POST localhost:8000/api/chat -H 'Content-Type: application/json' \
+    -d '{"message":"평균이 얼마야?"}'
+{"detail":"환경 변수 OPENAI_API_KEY 가 없어 AI 대화 를 사용할 수 없습니다.
+  로컬은 .env 파일에, 배포는 플랫폼 환경 변수에 설정하세요(값은 YOUR_KEY 자리)."}
+[HTTP 503]
+```
+
+---
+
+## 보안 및 운영 기본
+
+이 절에 흩어진 안전장치를 한곳에 모았습니다.
+
+### ① 키는 코드에 두지 않는다
+
+| 층 | 무엇을 | 어디에 |
+|---|---|---|
+| 1 | 코드는 **이름만** 안다 | `OPENAI_KEY_NAME = "OPENAI_API_KEY"` |
+| 2 | 실제 키 파일을 커밋에서 제외 | `.gitignore` 에 `.env`·`serviceAccountKey.json`·`*-firebase-adminsdk-*.json` |
+| 3 | 형식만 공유 | `.env.example` 의 값은 전부 `YOUR_KEY` 자리표시자 |
+
+```python
+# 값이 아니라 **이름만** 코드에 둔다.
+OPENAI_KEY_NAME = "OPENAI_API_KEY"
+FIREBASE_JSON_NAME = "FIREBASE_SERVICE_ACCOUNT_JSON"
+FIREBASE_PATH_NAME = "FIREBASE_SERVICE_ACCOUNT_PATH"  # 대안: 파일 경로
+ALLOWED_ORIGINS_NAME = "ALLOWED_ORIGINS"
+```
+
+키가 유출됐다면 코드에서 지우는 것으로 부족합니다(git 이력에 남습니다). 순서는
+① 콘솔에서 **즉시 폐기·재발급** ② 새 키를 환경 변수에 설정 ③ 노출된 커밋 이력 정리
+④ 사용량·청구 확인입니다.
+
+### ② 입력 검증
+
+Pydantic 이 요청 본문을 함수 진입 전에 검사합니다. 값 범위(`gt=0`), 길이 상한
+(`max_length`), 날짜 존재 여부까지 봅니다.
+
+```python
+class ChatIn(BaseModel):
+    """AI 대화 요청 — POST /api/chat"""
+
+    message: str = Field(..., min_length=1, max_length=1000, description="사용자 질문")
+    conversation_id: str | None = Field(None, description="이어 갈 대화 id(없으면 새로 만든다)")
+```
+
+`max_length=1000` 은 보안이자 **비용 방어**입니다 — 긴 입력이 그대로 토큰이 됩니다.
+
+### ③ 예외 처리 — 상태 코드로 원인을 가른다
+
+| 상황 | 코드 | 사용자가 할 일 |
+|---|---|---|
+| 요청 형식·값이 틀림 | 422 | 입력을 고친다(어느 필드인지 알려 준다) |
+| 대상이 없음 | 404 | id 를 확인한다 |
+| AI 를 쓸 수 없음 | 503 | 서버 키 설정을 확인한다(관리자) |
+| 저장소 연결 실패 | — | **서버가 죽지 않는다.** 로컬로 내려가고 로그에 남긴다 |
+
+마지막 줄이 중요합니다. 배포 중 키가 잘못 설정됐을 때 전체 서비스가 멈추는 것보다,
+경고를 남기고 도는 편이 낫습니다.
+
+### ④ 모델 출력을 신뢰하지 않는다
+
+도구 호출은 모델이 정하지만, **실행 여부와 범위는 서버가 정합니다.** 이름은 허용 목록으로
+확인하고 인자도 다시 검증합니다(위 [도구 호출](#1-도구-호출-function-calling) 참조).
+
+### ⑤ CORS 는 목록으로 제한한다
+
+`allow_origins=["*"]` 를 쓰지 않습니다. 허용 도메인은 환경 변수로 주고, 기본값에는 로컬
+개발 주소만 넣습니다.
+
+### ⑥ 비용 상한
+
+`max_tokens=600` · 이력 최근 10개 · 도구 호출 3왕복 · 입력 1000자 — 네 곳에서 막습니다.
+
 ---
 
 ## 컨텍스트 주입 — 이 서비스의 핵심 원리
@@ -663,7 +939,11 @@ def extended_statistics(documents: list[dict]) -> dict:
 
 이 값들도 시스템 프롬프트에 함께 들어가, "분포가 어때?" 같은 질문에 답할 수 있습니다.
 
-### 3. 프론트 시각화
+### 3. 프론트 시각화 · 선택 UI
+
+화면에는 **고르는 자리**가 여럿 있습니다 — 대화 기록에서 불러올 대화를 고르고, 데이터
+목록에서 삭제할 행을 고르고, 내보내기 형식(CSV/JSON)을 고르고, 테마(라이트/다크)를
+고릅니다. 고른 결과는 그 자리에서 화면에 반영됩니다.
 
 외부 차트 라이브러리 없이 **인라인 SVG** 로 그립니다 — 선 하나에 수백 KB 를 받아 올
 이유가 없습니다.
