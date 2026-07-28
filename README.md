@@ -37,6 +37,18 @@ GPT 는 우리 데이터베이스를 볼 수 없으므로, 서버가 **요약을
 M1-1 은 데이터를 **분석**했고, M1-2 는 그 결과를 **대화 가능한 서비스**로 만듭니다.
 같은 데이터를 두 번 만들지 않습니다.
 
+### 왜 이 데이터를 골랐나
+
+항공 승객 수(Box & Jenkins, 1949~1960 · 144개월)를 고른 이유는 셋입니다.
+
+| 이유 | 설명 |
+|---|---|
+| **AI 가 답할 거리가 많다** | 추세·계절성·변동성이 모두 뚜렷해 "언제가 성수기야?" "나빠지고 있어?" 같은 질문이 자연스럽게 나온다. 평평한 데이터였다면 요약 주입의 값어치를 보여 줄 수 없다 |
+| **요약과 원본의 차이가 드러난다** | 144개를 통째로 프롬프트에 넣으면 토큰이 커지고, 요약만 넣으면 "1960년 3월 값"은 답할 수 없다. **도구 호출이 왜 필요한지**가 이 데이터에서 실제로 드러난다 |
+| **검증이 가능하다** | 공개 데이터라 AI 답변의 숫자가 맞는지 사람이 대조할 수 있다. 사내 데이터였다면 "그럴듯한데 맞나?"를 확인할 방법이 없다 |
+
+요구 조건(100개 이상)도 144개로 충족합니다.
+
 ```bash
 python -m backend.seed
 # → 적재 144건 → 저장소(local)
@@ -262,6 +274,37 @@ def delete_data(data_id: str) -> None:
     """
     if not db.get_repository().delete(db.COLLECTION_DATA, data_id):
         raise HTTPException(status_code=404, detail=f"데이터를 찾을 수 없습니다: {data_id}")
+```
+
+목록 조회는 상한을 두어 응답이 무한정 커지지 않게 합니다.
+
+```python
+@router.get("", response_model=list[DataPointOut], summary="데이터 목록 조회")
+def list_data(limit: int = 500) -> list[DataPointOut]:
+    """등록된 데이터를 최신순으로 돌려준다.
+
+    상한을 두는 이유: 데이터가 수천 개가 되면 응답이 커져 프론트가 느려진다.
+    """
+    documents = db.get_repository().list(db.COLLECTION_DATA)
+    return [DataPointOut(**_normalize(d)) for d in documents[:limit]]
+```
+
+저장소 문서를 응답 모델로 옮기는 자리에 기본값을 채웁니다 — 옛 형식 문서가 남아 있어도
+응답이 깨지지 않게 합니다.
+
+```python
+def _normalize(document: dict) -> dict:
+    """저장소 문서 → 응답 모델이 받는 형태.
+
+    저장소에 옛 형식 문서가 남아 있어도 응답이 깨지지 않게 기본값을 채운다.
+    """
+    return {
+        "id": str(document.get("id", "")),
+        "period": str(document.get("period", "")),
+        "value": float(document.get("value", 0)),
+        "note": document.get("note"),
+        "created_at": str(document.get("created_at", "")),
+    }
 ```
 
 요약 엔드포인트가 AI 로 들어가는 값을 만듭니다.
