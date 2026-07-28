@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- 반응형의 출발점. 없으면 모바일이 데스크톱 폭으로 그린 뒤 축소해 글자만 작아진다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>시계열 데이터 AI Agent</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>시계열 데이터 AI Agent</h1>
+      <div class="topbar-right">
+        <span class="status" id="apiStatus">서버 확인 중…</span>
+        <button class="btn-ghost" id="themeToggle" type="button">🌙 다크</button>
+      </div>
+    </header>
+
+    <!-- 콜드스타트 안내 — 무료 티어는 첫 요청이 30초 이상 걸린다.
+         이 문구가 없으면 사용자는 "고장났다" 고 판단하고 떠난다. -->
+    <div class="notice" id="coldStart" hidden>
+      ⏳ 서버가 잠들어 있었습니다(무료 티어). 첫 응답까지 최대 1분 걸릴 수 있습니다.
+    </div>
+
+    <main class="layout">
+      <!-- ① 데이터 요약 -->
+      <section class="card" id="summaryCard">
+        <h2>데이터 요약</h2>
+        <p class="muted">AI 시스템 프롬프트에 그대로 들어가는 값입니다.</p>
+        <div class="kpis" id="summaryKpis"></div>
+        <p class="basis" id="trendBasis"></p>
+        <div class="chart-wrap">
+          <svg id="miniChart" viewBox="0 0 640 180" role="img" aria-label="데이터 추이"></svg>
+        </div>
+        <div class="row">
+          <button class="btn-ghost" id="exportCsv" type="button">CSV 내려받기</button>
+          <button class="btn-ghost" id="exportJson" type="button">JSON 내려받기</button>
+        </div>
+      </section>
+
+      <!-- ② 채팅 -->
+      <section class="card chat-card">
+        <h2>AI 대화</h2>
+        <div class="chat-log" id="chatLog" aria-live="polite">
+          <div class="bubble assistant">
+            데이터에 대해 물어보세요. 요약이 시스템 프롬프트로 함께 전달됩니다.
+          </div>
+        </div>
+        <form class="chat-form" id="chatForm">
+          <input id="chatInput" type="text" placeholder="예) 최근 추세가 어때?" autocomplete="off" />
+          <button class="btn" id="chatSend" type="submit">보내기</button>
+        </form>
+        <p class="muted" id="chatMeta"></p>
+      </section>
+
+      <!-- ③ 데이터 관리 -->
+      <section class="card">
+        <h2>데이터 관리</h2>
+        <form class="inline-form" id="dataForm">
+          <input id="periodInput" type="text" placeholder="1961-01" aria-label="시점" />
+          <input id="valueInput" type="number" step="0.1" placeholder="450" aria-label="값" />
+          <input id="noteInput" type="text" placeholder="메모(선택)" aria-label="메모" />
+          <button class="btn" type="submit">추가</button>
+        </form>
+        <p class="error" id="dataError" hidden></p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>시점</th><th>값</th><th>메모</th><th></th></tr>
+            </thead>
+            <tbody id="dataBody"></tbody>
+          </table>
+        </div>
+        <p class="muted" id="dataCount"></p>
+      </section>
+
+      <!-- ④ 대화 기록 -->
+      <section class="card">
+        <h2>대화 기록</h2>
+        <p class="muted">제목을 누르면 그 대화를 불러옵니다.</p>
+        <ul class="conv-list" id="convList"></ul>
+      </section>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

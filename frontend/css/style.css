@@ -1,0 +1,233 @@
+/*
+ * 스타일 — 변수 → 뼈대 → 컴포넌트 → 반응형 → 다크 모드 순.
+ *
+ * 변수를 맨 위에 모은 이유: 다크 모드를 변수 값 교체만으로 구현하므로 아래 규칙을
+ * 두 번 쓰지 않는다.
+ */
+
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --text: #1f2128;
+  --muted: #6b7280;
+  --line: #e3e5ea;
+  --brand: #3b6ea5;
+  --brand-soft: #e8f0f8;
+  --danger: #b3453a;
+  --ok: #3f8f5f;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  line-height: 1.6;
+}
+
+/* 상단 바 */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar h1 { font-size: 19px; margin: 0; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.status { font-size: 13px; color: var(--muted); }
+.status.ok { color: var(--ok); }
+.status.bad { color: var(--danger); }
+
+.notice {
+  margin: 12px 20px 0;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: #fff4e5;
+  border: 1px solid #f3d9b0;
+  color: #7a4b12;
+  font-size: 14px;
+}
+
+/* 레이아웃 — 큰 화면에서 2열 */
+.layout {
+  display: grid;
+  gap: 16px;
+  padding: 16px 20px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.card h2 { margin: 0 0 6px; font-size: 17px; }
+.muted { color: var(--muted); font-size: 13px; margin: 4px 0; }
+.basis { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.error { color: var(--danger); font-size: 13px; }
+
+/* KPI */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.kpi { background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.kpi .label { font-size: 12px; color: var(--muted); }
+.kpi .value { font-size: 19px; font-weight: 700; }
+
+.chart-wrap { margin: 10px 0; }
+svg { width: 100%; height: auto; display: block; }
+
+/* 버튼·입력 */
+.btn, .btn-ghost {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn { background: var(--brand); color: #fff; }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.btn-ghost { background: var(--brand-soft); color: var(--brand); }
+
+input {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: inherit;
+  font-size: 14px;
+  min-width: 0;
+}
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr auto;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+/* 채팅 */
+.chat-log {
+  height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bubble {
+  padding: 9px 13px;
+  border-radius: 14px;
+  max-width: 85%;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+
+.bubble.user { background: var(--brand); color: #fff; align-self: flex-end; }
+.bubble.assistant { background: var(--card); border: 1px solid var(--line); align-self: flex-start; }
+.bubble.error { background: #f7e7e4; color: var(--danger); align-self: flex-start; }
+
+/* 로딩 점 — 응답을 기다리는 동안 화면이 멈춘 것처럼 보이면 안 된다 */
+.bubble.loading::after {
+  content: "···";
+  animation: dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0% { content: "·"; }
+  33% { content: "··"; }
+  66% { content: "···"; }
+}
+
+.chat-form { display: flex; gap: 8px; margin-top: 10px; }
+.chat-form input { flex: 1; }
+
+/* 표 */
+.table-wrap { max-height: 260px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--card); }
+td.num { text-align: right; }
+
+.link-danger {
+  background: none;
+  border: 0;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
+/* 대화 목록 */
+.conv-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.conv-item button.title {
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  flex: 1;
+  padding: 0;
+}
+
+.conv-item button.title:hover { color: var(--brand); }
+
+/* 반응형 — 넓은 화면에서 2열, 채팅은 두 칸 차지 */
+@media (min-width: 900px) {
+  .layout { grid-template-columns: 1fr 1fr; }
+  .chat-card { grid-row: span 2; }
+}
+
+@media (max-width: 620px) {
+  .inline-form { grid-template-columns: 1fr 1fr; }
+  .inline-form button { grid-column: span 2; }
+}
+
+/* 다크 모드(보너스) — 변수만 갈아 끼운다 */
+body.dark {
+  --bg: #16181d;
+  --card: #1e2128;
+  --text: #e8eaee;
+  --muted: #99a0ac;
+  --line: #2c3038;
+  --brand: #6d9dd1;
+  --brand-soft: #26303c;
+  --danger: #e08a80;
+  --ok: #6cc08a;
+}
+
+body.dark .notice { background: #3a2c16; border-color: #5c4726; color: #f0d5a8; }
