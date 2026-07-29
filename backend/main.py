@@ -16,9 +16,11 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from . import config, db
 from .routers import chat, conversations, data
@@ -83,3 +85,11 @@ def on_startup() -> None:
     logger.info("저장소: %s", db.repository_kind())
     if config.get_openai_key() is None:
         logger.warning("%s", config.missing_key_message(config.OPENAI_KEY_NAME, "AI 대화"))
+
+
+# 단일 서버 배포용 프론트 서빙 — "/" 는 헬스체크가 쓰고 있어 "/app" 에 마운트한다.
+# 프론트 fetch 는 절대경로(/api/…)라 접두사와 무관하게 같은 origin 으로 닿는다.
+# (Vercel+Render 분리 배포도 그대로 성립 — 이 마운트는 frontend/ 가 있을 때만 붙는다.)
+_WEB_DIR = Path(__file__).resolve().parent.parent / "frontend"
+if _WEB_DIR.is_dir():
+    app.mount("/app", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")

@@ -12,10 +12,12 @@
  * 그래서 배포 시 이 파일의 값을 바꾸거나, 아래 window.__API_BASE__ 로 덮어쓴다.
  * (Vercel 은 정적 파일 배포이므로 config.js 를 따로 두고 환경별로 교체하는 방식도 흔하다.)
  */
+/* 기본 '' = same-origin — 백엔드가 /app 에 이 프론트를 함께 서빙하는 단일 서버 배포에서
+ * 그대로 동작한다. 분리 배포(Vercel 정적 + Render API)면 아래 두 오버라이드로 지정한다. */
 const API_BASE =
   window.__API_BASE__ ||
   localStorage.getItem('api-base') ||
-  'http://127.0.0.1:8000';
+  '';
 
 /* 무료 티어(Render)는 잠들었다 깨는 데 오래 걸린다 — 넉넉히 잡되 무한정 기다리지 않는다 */
 const TIMEOUT_MS = 70000;
