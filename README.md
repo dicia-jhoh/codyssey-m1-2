@@ -10,7 +10,7 @@
 | 프론트엔드 | 순수 HTML · CSS · JavaScript (프레임워크 없음) |
 | 데이터베이스 | Firebase Firestore (자격 없으면 로컬 JSON 으로 자동 전환) |
 | AI | OpenAI GPT — 컨텍스트 주입 + 도구 호출(Function Calling) |
-| 배포 | 백엔드 Render · 프론트 Vercel |
+| 배포 | OCI 단일 서버 — FastAPI + 정적 프론트(`/app`) |
 | 데이터 | 항공 승객 수 144개월 (**M1-1 분석 데이터 계승**) |
 
 ---
@@ -61,13 +61,13 @@ python -m backend.seed
 
 | 대상 | 주소 |
 |---|---|
-| 프론트엔드 (Vercel) | **실제 연동 시 이 자리** — `https://<프로젝트>.vercel.app` |
-| 백엔드 API (Render) | **실제 연동 시 이 자리** — `https://<서비스>.onrender.com` |
-| Swagger 문서 | **실제 연동 시 이 자리** — `https://<서비스>.onrender.com/docs` |
+| 프론트엔드 | [http://129.225.184.224:8033/app/](http://129.225.184.224:8033/app/) |
+| 백엔드 API | [http://129.225.184.224:8033/](http://129.225.184.224:8033/) |
+| Swagger 문서 | [http://129.225.184.224:8033/docs](http://129.225.184.224:8033/docs) |
 
-> ⚠ 이 저장소는 학습용 예시 답안이라 실제 Render·Vercel·Firebase 프로젝트를 연결하지
-> 않았습니다. 아래 [배포 방법](#배포-방법)대로 하면 위 자리에 주소가 들어갑니다.
-> **연결 없이도 로컬에서 전 기능이 동작합니다**(Firestore 는 로컬 저장소로 자동 전환).
+프론트와 API를 OCI의 같은 origin에서 서비스합니다. 별도 정적 호스팅보다 CORS 설정이
+단순하고, GitHub Pages만으로는 실행할 수 없는 FastAPI와 Swagger까지 한 주소에서 검증할 수
+있습니다. 서버는 `codyssey-m1-2.service`로 재부팅 후에도 다시 기동합니다.
 
 ---
 
@@ -708,9 +708,9 @@ class Repository(Protocol):
 
 ## CORS — 왜 필요하고, 무엇을 겪었나
 
-프론트(Vercel)와 백엔드(Render)는 **다른 도메인**에 있습니다. 브라우저는 기본적으로 다른
-출처로의 요청을 막으므로(동일 출처 정책), 서버가 "이 출처는 허용한다"고 응답 헤더로
-알려 줘야 합니다.
+현재 OCI 배포는 프론트와 백엔드가 **같은 origin**이라 CORS 허용이 필요 없습니다. 다만
+정적 프론트와 API를 다른 도메인으로 분리하면 브라우저의 동일 출처 정책이 적용되므로, 서버가
+"이 출처는 허용한다"고 응답 헤더로 알려 줘야 합니다.
 
 ```python
 app.add_middleware(
@@ -753,7 +753,7 @@ ALLOWED_ORIGINS="http://127.0.0.1:8078" uvicorn backend.main:app
 # → access-control-allow-origin: http://127.0.0.1:8078
 ```
 
-배포에서 Vercel 도메인을 넣는 자리와 **정확히 같습니다.**
+분리 배포에서 정적 프론트 도메인을 넣는 자리와 **정확히 같습니다.**
 
 ---
 
@@ -792,8 +792,9 @@ ALLOWED_ORIGINS="http://127.0.0.1:8078" uvicorn backend.main:app
 
 ### 콜드스타트 안내 (무료 티어 대응)
 
-Render 무료 티어는 일정 시간 요청이 없으면 잠들었다가 다음 요청에 깨어납니다.
-**첫 요청이 30초 이상** 걸릴 수 있습니다.
+일부 무료 호스팅은 일정 시간 요청이 없으면 잠들었다가 다음 요청에 깨어납니다.
+**첫 요청이 30초 이상** 걸릴 수 있어, 현재 OCI 배포에서도 느린 네트워크를 설명하는 방어적
+안내를 유지합니다.
 
 ```javascript
   /* 응답이 늦으면 콜드스타트 안내를 띄운다 — 화면이 멈춘 것처럼 보이면 안 된다 */
@@ -812,40 +813,40 @@ Swagger 설명에도 같은 안내를 넣었습니다.
 
 ## 배포 방법
 
-### 백엔드 → Render
+### OCI 단일 서버
 
-1. GitHub 에 코드를 푸시합니다.
-2. Render → **New Web Service** → 이 저장소 선택
-3. 설정:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-4. **Environment** 에 환경 변수 등록:
-   - `OPENAI_API_KEY`
-   - `FIREBASE_SERVICE_ACCOUNT_JSON` (키 파일 내용을 한 줄로)
-   - `ALLOWED_ORIGINS` (Vercel 주소)
-5. 배포 후 `https://<서비스>.onrender.com/docs` 에서 Swagger 확인
+이 저장소는 FastAPI가 `frontend/`를 `/app`에 함께 마운트하므로 프론트와 API를 한
+프로세스로 배포합니다.
 
-⚠ `--port $PORT` 가 중요합니다. Render 는 포트를 환경 변수로 지정하며, 8000 을 고정하면
-**연결되지 않습니다.**
+```bash
+# 서버: 저장소 갱신과 의존성 설치
+cd ~/codyssey-m1-2
+git pull --ff-only
+uv venv --allow-existing
+uv pip install -r requirements.txt
 
-### 프론트엔드 → Vercel
-
-1. Vercel → **Add New Project** → 이 저장소 선택
-2. Root Directory 를 `frontend` 로 지정
-3. Framework Preset = **Other** (빌드 단계가 없습니다)
-4. 백엔드 주소를 알려 줍니다 — 정적 배포라 번들러가 `process.env` 를 바꿔치기해 줄 수
-   없으므로, `frontend/js/api.js` 의 기본값을 배포 주소로 바꾸거나 `index.html` 에
-   `<script>window.__API_BASE__ = 'https://...';</script>` 한 줄을 넣습니다.
-
-```javascript
-const API_BASE =
-  window.__API_BASE__ ||
-  localStorage.getItem('api-base') ||
-  'http://127.0.0.1:8000';
+# codyssey-m1-2.service 재시작
+sudo systemctl restart codyssey-m1-2
+systemctl is-active codyssey-m1-2
 ```
 
-5. 배포 후 그 주소를 백엔드의 `ALLOWED_ORIGINS` 에 추가하고 **재배포**합니다
-   (환경 변수는 재배포해야 반영됩니다).
+서비스는 다음 명령으로 실행됩니다.
+
+```bash
+.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8033
+```
+
+배포 후 세 표면을 각각 확인합니다.
+
+```bash
+curl -f http://129.225.184.224:8033/
+curl -f http://129.225.184.224:8033/app/ -o /dev/null
+curl -f http://129.225.184.224:8033/docs -o /dev/null
+```
+
+GitHub Pages는 정적 파일만 제공하므로 FastAPI와 Swagger를 실행할 수 없습니다. 별도
+호스팅을 추가하는 대신 OCI에서 두 층을 함께 서비스해 이 미션의 배포 검증 범위를 한 번에
+충족했습니다.
 
 ---
 
@@ -1050,7 +1051,7 @@ CSS 변수만 갈아 끼우는 방식이라 규칙을 두 번 쓰지 않습니�
 | 최신 브라우저 | Chrome·Edge·Safari |
 | OpenAI API 키 | AI 대화에만 필요. 없어도 나머지 기능은 동작합니다 |
 | Firebase 프로젝트 | 배포에만 필요. 로컬은 자동으로 파일 저장소를 씁니다 |
-| Render·Vercel 계정 | 배포할 때만 |
+| OCI 서버 접속 권한 | 배포할 때만 |
 
 ---
 
