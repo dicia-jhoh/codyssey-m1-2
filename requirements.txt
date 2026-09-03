@@ -9,8 +9,8 @@ pydantic>=2.6
 # 설치만 해 두고 키 없이도 서버는 뜬다.
 firebase-admin>=6.5
 
-# GPT 호출
-openai>=1.30
+# 코드시세이 공식 게이트웨이(copa) 호출 — Anthropic 규격
+anthropic>=1.0
 
 # .env 로더 — 이 프로젝트는 backend/config.py 에 직접 구현했지만,
 # 미션이 요구한 패키지라 함께 명시한다.

@@ -74,7 +74,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "storage": db.repository_kind(),
-        "ai_ready": config.get_openai_key() is not None,
+        "ai_ready": config.get_copa_key() is not None,
         "docs": "/docs",
     }
 
@@ -83,8 +83,8 @@ def health() -> dict:
 def on_startup() -> None:
     """시작 시 저장소를 한 번 붙여 본다 — 문제가 있으면 첫 요청이 아니라 여기서 로그에 뜬다."""
     logger.info("저장소: %s", db.repository_kind())
-    if config.get_openai_key() is None:
-        logger.warning("%s", config.missing_key_message(config.OPENAI_KEY_NAME, "AI 대화"))
+    if config.get_copa_key() is None:
+        logger.warning("%s", config.missing_key_message(config.COPA_KEY_NAME, "AI 대화"))
 
 
 # 단일 서버 배포용 프론트 서빙 — "/" 는 헬스체크가 쓰고 있어 "/app" 에 마운트한다.

@@ -15,12 +15,16 @@ import os
 from pathlib import Path
 
 # 값이 아니라 **이름만** 코드에 둔다.
-OPENAI_KEY_NAME = "OPENAI_API_KEY"
+COPA_KEY_NAME = "COPA_API_KEY"
 FIREBASE_JSON_NAME = "FIREBASE_SERVICE_ACCOUNT_JSON"
 FIREBASE_PATH_NAME = "FIREBASE_SERVICE_ACCOUNT_PATH"  # 대안: 파일 경로
 ALLOWED_ORIGINS_NAME = "ALLOWED_ORIGINS"
 
-DEFAULT_MODEL = "gpt-4o-mini"
+# 코드시세이 공식 게이트웨이(copa) — 기관 키로 정산되는 Anthropic 호환 엔드포인트.
+# ⚠ 끝에 /v1 을 붙이지 않는다 — anthropic SDK가 자체적으로 /v1/messages 를 이어 붙여서,
+# base_url에 /v1 이 있으면 /v1/v1/messages 로 겹쳐 403(public_api_scope_denied)이 난다.
+COPA_BASE_URL = "https://copa.codyssey.kr"
+DEFAULT_MODEL = "claude-haiku-4"
 # 응답 길이를 묶어 요금과 대기시간을 예측 가능하게 만든다(미션 요구: 토큰 제한).
 MAX_TOKENS = 600
 REQUEST_TIMEOUT = 60
@@ -44,9 +48,9 @@ def load_dotenv(path: str = ".env") -> None:
                 os.environ[key] = value.strip().strip('"').strip("'")
 
 
-def get_openai_key() -> str | None:
-    """OpenAI 키. 없으면 None — 호출한 쪽이 안내한다."""
-    return os.environ.get(OPENAI_KEY_NAME, "").strip() or None
+def get_copa_key() -> str | None:
+    """copa(코드시세이 공식 게이트웨이) 키. 없으면 None — 호출한 쪽이 안내한다."""
+    return os.environ.get(COPA_KEY_NAME, "").strip() or None
 
 
 def get_firebase_credentials() -> dict | None:
