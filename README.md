@@ -1,6 +1,10 @@
 # 시계열 데이터 AI Agent (M1-2)
 
-시계열 데이터를 저장하고, 그 **요약을 시스템 프롬프트에 주입**해 GPT 와 대화하는 풀스택
+![Python](https://img.shields.io/badge/python-3.10+-blue)
+![Live](https://img.shields.io/badge/OCI-live-success)
+![AI](https://img.shields.io/badge/AI-copa%20claude--haiku--4-6f42c1)
+
+시계열 데이터를 저장하고, 그 **요약을 시스템 프롬프트에 주입**해 AI 와 대화하는 풀스택
 서비스입니다. "이 데이터 추세가 어때?" 라고 물으면 AI 가 **실제 저장된 데이터에 근거해**
 답합니다.
 
@@ -9,11 +13,37 @@
 | 백엔드 | FastAPI (라우터/서비스/저장소 3계층) |
 | 프론트엔드 | 순수 HTML · CSS · JavaScript (프레임워크 없음) |
 | 데이터베이스 | Firebase Firestore (자격 없으면 로컬 JSON 으로 자동 전환) |
-| AI | OpenAI GPT — 컨텍스트 주입 + 도구 호출(Function Calling) |
+| AI | codyssey 공식 게이트웨이(copa) claude-haiku-4 — 컨텍스트 주입 + 도구 호출(tool use) |
 | 배포 | OCI 단일 서버 — FastAPI + 정적 프론트(`/app`) |
 | 데이터 | 항공 승객 수 144개월 (**M1-1 분석 데이터 계승**) |
 
 ---
+
+<details>
+<summary><strong>목차</strong></summary>
+
+- [무엇을 해결하나](#무엇을-해결하나)
+- [이 미션의 위치](#이-미션의-위치)
+- [배포 URL](#배포-url)
+- [로컬 실행 방법](#로컬-실행-방법)
+- [환경 변수](#환경-변수)
+- [프로젝트 구조 — 왜 이렇게 나눴나](#프로젝트-구조--왜-이렇게-나눴나)
+- [API 엔드포인트](#api-엔드포인트)
+- [보안 및 운영 기본](#보안-및-운영-기본)
+- [컨텍스트 주입 — 이 서비스의 핵심 원리](#컨텍스트-주입--이-서비스의-핵심-원리)
+- [Firestore — 자격이 없으면 로컬로 내려간다](#firestore--자격이-없으면-로컬로-내려간다)
+- [Pydantic 검증 — 입구에서 막는다](#pydantic-검증--입구에서-막는다)
+- [CORS — 왜 필요하고, 무엇을 겪었나](#cors--왜-필요하고-무엇을-겪었나)
+- [프론트엔드 화면](#프론트엔드-화면)
+- [배포 방법](#배포-방법)
+- [비용·과금 주의](#비용과금-주의)
+- [보너스 (수행)](#보너스-수행)
+- [제약 조건 준수](#제약-조건-준수)
+- [준비물 (전제 지식 0)](#준비물-전제-지식-0)
+- [용어 사전](#용어-사전)
+- [따라 하기](#따라-하기)
+
+</details>
 
 ## 무엇을 해결하나
 
@@ -21,7 +51,7 @@
 열어 직접 계산하거나, 분석 도구를 배워야 하죠.
 
 이 서비스는 그 사이를 메웁니다 — 데이터를 넣어 두면 **평소 말하듯 물어보면** 됩니다.
-GPT 는 우리 데이터베이스를 볼 수 없으므로, 서버가 **요약을 만들어 대화 시작 전에 알려
+AI 는 우리 데이터베이스를 볼 수 없으므로, 서버가 **요약을 만들어 대화 시작 전에 알려
 주는 방식**(컨텍스트 주입)으로 연결했습니다.
 
 ---
@@ -113,7 +143,7 @@ ALLOWED_ORIGINS="http://localhost:5500" uvicorn backend.main:app --reload
 
 | 이름 | 필수 | 쓰임 |
 |---|---|---|
-| `OPENAI_API_KEY` | AI 대화에 필수 | GPT 호출. 없으면 `/api/chat` 이 503 과 안내를 돌려준다 |
+| `COPA_API_KEY` | AI 대화에 필수 | copa(claude-haiku-4) 호출. 없으면 `/api/chat` 이 503 과 안내를 돌려준다 |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | 배포에 필수 | 서비스 계정 키 **JSON 문자열**. 없으면 로컬 저장소로 전환 |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | 선택 | 위 대신 파일 경로로 줄 때 |
 | `ALLOWED_ORIGINS` | 배포에 필수 | CORS 허용 도메인(쉼표 구분). 프론트 주소를 넣는다 |
@@ -151,10 +181,10 @@ codyssey-m1-2/
 │   ├── routers/
 │   │   ├── data.py           CRUD 4개 + 요약 + 통계
 │   │   ├── conversations.py  대화 저장·목록·상세·삭제
-│   │   └── chat.py           AI 대화(요약 주입 → GPT → 자동 저장)
+│   │   └── chat.py           AI 대화(요약 주입 → copa → 자동 저장)
 │   └── services/
 │       ├── summary.py        요약 계산 · 추세 판정 · 시스템 프롬프트 생성
-│       └── ai.py             GPT 호출 · 도구 호출(Function Calling)
+│       └── ai.py             copa 호출 · 도구 호출(tool use)
 ├── frontend/
 │   ├── index.html         화면 4구역(요약·채팅·데이터 관리·대화 기록)
 │   ├── css/style.css      변수 → 컴포넌트 → 반응형 → 다크 모드
@@ -225,16 +255,13 @@ def get_summary() -> SummaryOut:
 
 미션이 정한 흐름을 그대로 구현했습니다.
 
-```text
-POST /api/chat  {"message": "추세가 어때?", "conversation_id": null}
-   │
-   ├─ ① 데이터 요약 조회        services/summary.compute_summary()
-   ├─ ② 시스템 프롬프트에 삽입   services/summary.build_system_prompt()
-   ├─ ③ GPT 호출               services/ai.chat()  ← 필요하면 도구 호출
-   └─ ④ 대화 자동 저장          conversations 컬렉션
-   │
-   ▼
-{"reply": "...", "conversation_id": "abc", "used_summary": true, "tool_calls": [...]}
+```mermaid
+flowchart TD
+    A["POST /api/chat<br/>message, conversation_id"] --> B["① 데이터 요약 조회<br/>summary.compute_summary()"]
+    B --> C["② 시스템 프롬프트에 삽입<br/>summary.build_system_prompt()"]
+    C --> D["③ copa 호출<br/>ai.chat() ← 필요하면 도구 호출"]
+    D --> E["④ 대화 자동 저장<br/>conversations 컬렉션"]
+    E --> F["reply, conversation_id,<br/>used_summary, tool_calls"]
 ```
 
 **자동 저장을 이 엔드포인트에 둔 이유**: 사용자가 "저장" 버튼을 누르기를 기다리면 대부분
@@ -392,7 +419,7 @@ $ curl localhost:8000/api/conversations/f5924dd93ff04ca6bfb3
 ```python
 @router.post("", response_model=ChatOut, summary="AI 대화")
 def chat(payload: ChatIn) -> ChatOut:
-    """질문을 받아 데이터 요약을 넣고 GPT 에 묻는다. 대화는 자동 저장된다."""
+    """질문을 받아 데이터 요약을 넣고 copa(claude-haiku-4)에 묻는다. 대화는 자동 저장된다."""
     repository = db.get_repository()
     documents = repository.list(db.COLLECTION_DATA)
 
@@ -408,7 +435,7 @@ def chat(payload: ChatIn) -> ChatOut:
             )
         history = conversation.get("messages") or []
 
-    # ②③ 요약 주입 + GPT 호출
+    # ②③ 요약 주입 + copa 호출
     try:
         reply, used_tools = ai_service.chat(payload.message, history, documents)
     except ai_service.AIUnavailable as exc:
@@ -432,37 +459,41 @@ def chat(payload: ChatIn) -> ChatOut:
         conversation_id = record["id"]
 ```
 
-#### GPT 호출 — `backend/services/ai.py`
+#### copa 호출 — `backend/services/ai.py`
 
 ```python
         try:
-            response = client.chat.completions.create(
+            response = client.messages.create(
                 model=config.DEFAULT_MODEL,
+                system=system_prompt,
                 messages=messages,
                 tools=TOOL_SCHEMAS,
-                # 사실 기반 답변이라 낮게. 같은 데이터에 매번 다른 숫자가 나오면 안 된다.
-                temperature=0.2,
                 max_tokens=config.MAX_TOKENS,
+                # 설치된 anthropic SDK 버전엔 temperature 가 타입 인자로 없다 — extra_body 로
+                # 우회해 넘긴다. 사실 기반 답변이라 낮게: 같은 데이터에 매번 다른 숫자가
+                # 나오면 안 된다.
+                extra_body={"temperature": 0.2},
             )
         except Exception as exc:  # noqa: BLE001 — SDK 예외 종류가 버전마다 다르다
-            logger.error("OpenAI 호출 실패: %s", exc)
+            logger.error("copa 호출 실패: %s", exc)
             raise AIUnavailable(f"AI 호출에 실패했습니다: {exc}") from exc
 
-        choice = response.choices[0].message
-        tool_calls = getattr(choice, "tool_calls", None)
+        tool_uses = [block for block in response.content if block.type == "tool_use"]
 
-        if not tool_calls:
-            return (choice.content or "").strip(), used_tools
+        if not tool_uses:
+            text = "".join(block.text for block in response.content if block.type == "text")
+            return text.strip(), used_tools
 ```
 
-메시지를 조립하는 부분에 컨텍스트 주입과 이력 제한이 함께 들어 있습니다.
+Anthropic 규격은 시스템 프롬프트를 `messages` 안에 넣지 않고 별도 `system=` 인자로 받습니다.
+메시지 조립에는 이력 제한만 들어갑니다.
 
 ```python
     data_summary = summary_service.compute_summary(documents)
     extended = summary_service.extended_statistics(documents)
     system_prompt = summary_service.build_system_prompt(data_summary, extended)
 
-    messages: list[dict] = [{"role": "system", "content": system_prompt}]
+    messages: list[dict] = []
     # 이전 대화는 최근 것만 넣는다 — 전부 넣으면 토큰이 무한정 커진다
     for entry in history[-10:]:
         if entry.get("role") in ("user", "assistant") and entry.get("content"):
@@ -475,7 +506,7 @@ def chat(payload: ChatIn) -> ChatOut:
 ```text
 $ curl -X POST localhost:8000/api/chat -H 'Content-Type: application/json' \
     -d '{"message":"평균이 얼마야?"}'
-{"detail":"환경 변수 OPENAI_API_KEY 가 없어 AI 대화 를 사용할 수 없습니다.
+{"detail":"환경 변수 COPA_API_KEY 가 없어 AI 대화 를 사용할 수 없습니다.
   로컬은 .env 파일에, 배포는 플랫폼 환경 변수에 설정하세요(값은 YOUR_KEY 자리)."}
 [HTTP 503]
 ```
@@ -490,13 +521,13 @@ $ curl -X POST localhost:8000/api/chat -H 'Content-Type: application/json' \
 
 | 층 | 무엇을 | 어디에 |
 |---|---|---|
-| 1 | 코드는 **이름만** 안다 | `OPENAI_KEY_NAME = "OPENAI_API_KEY"` |
+| 1 | 코드는 **이름만** 안다 | `COPA_KEY_NAME = "COPA_API_KEY"` |
 | 2 | 실제 키 파일을 커밋에서 제외 | `.gitignore` 에 `.env`·`serviceAccountKey.json`·`*-firebase-adminsdk-*.json` |
 | 3 | 형식만 공유 | `.env.example` 의 값은 전부 `YOUR_KEY` 자리표시자 |
 
 ```python
 # 값이 아니라 **이름만** 코드에 둔다.
-OPENAI_KEY_NAME = "OPENAI_API_KEY"
+COPA_KEY_NAME = "COPA_API_KEY"
 FIREBASE_JSON_NAME = "FIREBASE_SERVICE_ACCOUNT_JSON"
 FIREBASE_PATH_NAME = "FIREBASE_SERVICE_ACCOUNT_PATH"  # 대안: 파일 경로
 ALLOWED_ORIGINS_NAME = "ALLOWED_ORIGINS"
@@ -551,7 +582,7 @@ class ChatIn(BaseModel):
 
 ## 컨텍스트 주입 — 이 서비스의 핵심 원리
 
-**GPT 는 우리 데이터베이스를 볼 수 없습니다.** 대화 시작 전에 "너는 이런 데이터를 알고
+**AI 는 우리 데이터베이스를 볼 수 없습니다.** 대화 시작 전에 "너는 이런 데이터를 알고
 있다"고 **글로 적어 주는 것**이 유일한 통로입니다. 그래서 요약의 품질이 곧 답변의 품질이
 됩니다.
 
@@ -852,10 +883,12 @@ GitHub Pages는 정적 파일만 제공하므로 FastAPI와 Swagger를 실행할
 
 ## 비용·과금 주의
 
-개인 OpenAI 키를 쓰면 **호출마다 과금**됩니다. 이 프로젝트는 세 가지로 방어합니다.
+codyssey 공식 게이트웨이(copa)는 기관 키로 정산되고 **(입력+출력) 토큰 × 모델별 배수**로
+차감됩니다(`claude-haiku-4` 는 0.5배). 개인 키가 아니어도 소진량은 그대로 남으므로 이 프로젝트는
+세 가지로 방어합니다.
 
 ```python
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "claude-haiku-4"
 # 응답 길이를 묶어 요금과 대기시간을 예측 가능하게 만든다(미션 요구: 토큰 제한).
 MAX_TOKENS = 600
 REQUEST_TIMEOUT = 60
@@ -888,22 +921,19 @@ REQUEST_TIMEOUT = 60
 ```python
 TOOL_SCHEMAS = [
     {
-        "type": "function",
-        "function": {
-            "name": "get_data_points",
-            "description": (
-                "등록된 데이터 포인트를 조회한다. 특정 기간의 실제 값이 필요하거나, "
-                "요약만으로 답할 수 없는 질문일 때 사용한다."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "period_prefix": {
-                        "type": "string",
-                        "description": "기간 접두사로 거른다. 예: '1960' (그 해 전체), '1960-07' (그 달)",
-                    },
-                    "limit": {"type": "integer", "description": "최대 개수(기본 20)"},
+        "name": "get_data_points",
+        "description": (
+            "등록된 데이터 포인트를 조회한다. 특정 기간의 실제 값이 필요하거나, "
+            "요약만으로 답할 수 없는 질문일 때 사용한다."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "period_prefix": {
+                    "type": "string",
+                    "description": "기간 접두사로 거른다. 예: '1960' (그 해 전체), '1960-07' (그 달)",
                 },
+                "limit": {"type": "integer", "description": "최대 개수(기본 20)"},
             },
         },
     },
@@ -916,25 +946,18 @@ TOOL_SCHEMAS = [
 
 #### 호출 흐름
 
-```text
-사용자: "1960년 값만 따로 볼 수 있어?"
-   │
-   ▼
-① 시스템 프롬프트(요약) + 질문을 GPT 에 보낸다
-   │
-   ▼
-② GPT 판단: "요약에는 연도별 값이 없다 → 도구가 필요하다"
-   └─ tool_calls: get_data_points({"period_prefix": "1960"})
-   │
-   ▼
-③ 서버가 도구를 실제로 실행 (backend/services/ai.py::_run_tool)
-   └─ {"matched": 12, "returned": 12, "points": [{"period":"1960-01","value":417}, ...]}
-   │
-   ▼
-④ 결과를 대화에 이어 붙여 GPT 에 다시 보낸다
-   │
-   ▼
-⑤ GPT 최종 답변: "1960년은 417부터 시작해 7월 622로 정점을 찍고…"
+```mermaid
+sequenceDiagram
+    actor U as 사용자
+    participant S as 서버(chat.py)
+    participant M as copa(claude-haiku-4)
+    U->>S: "1960년 값만 따로 볼 수 있어?"
+    S->>M: 시스템 프롬프트(요약) + 질문
+    M-->>S: tool_use get_data_points(period_prefix="1960")
+    S->>S: _run_tool 실행 → matched 12, returned 12
+    S->>M: tool_result 이어 붙여 재호출
+    M-->>S: "1960년은 417부터 시작해 7월 622로 정점을 찍고…"
+    S-->>U: 최종 답변
 ```
 
 응답의 `tool_calls` 필드로 **어떤 도구가 불렸는지** 프론트에 알려 주고, 화면 하단에
@@ -957,9 +980,8 @@ def _run_tool(name: str, arguments: dict, documents: list[dict]) -> dict:
         limit = max(1, min(limit, TOOL_RESULT_CAP))  # 모델이 크게 잡아도 여기서 자른다
 ```
 
-> **MCP Server / GPT Actions 연동**은 **실제 연동 시 이 자리**입니다. 도구 스키마가 이미
-> OpenAI 함수 호출 규격이므로, GPT Actions 는 이 저장소의 OpenAPI 문서(`/openapi.json`)를
-> 그대로 등록하면 되고, MCP Server 는 `_run_tool` 의 분기를 MCP 도구 핸들러로 옮기면
+> **MCP Server 연동**은 **실제 연동 시 이 자리**입니다. 도구 스키마가 이미 Anthropic
+> tool_use 규격이므로, MCP Server 는 `_run_tool` 의 분기를 MCP 도구 핸들러로 옮기면
 > 됩니다. 배포 URL 이 있어야 외부 채널에서 호출할 수 있어 이번에는 로컬 검증까지만
 > 수행했습니다.
 
@@ -1025,15 +1047,15 @@ CSS 변수만 갈아 끼우는 방식이라 규칙을 두 번 쓰지 않습니�
 | 제약 | 어떻게 지켰나 |
 |---|---|
 | Python 3.10 이상 · venv | `str \| None` 등 3.10+ 문법, 실행 방법에 venv 명시 |
-| fastapi·uvicorn·firebase-admin·openai·python-dotenv | `requirements.txt` 전부 포함 |
+| fastapi·uvicorn·firebase-admin·anthropic·python-dotenv | `requirements.txt` 전부 포함 |
 | 백엔드 FastAPI | `backend/` — 라우터/서비스/저장소 3계층 |
 | 프론트 순수 HTML/CSS/JS | 프레임워크·번들러·CDN 스크립트 0개 |
 | DB Firestore | `FirestoreRepository` (자격 없으면 로컬 전환) |
-| GPT API | `services/ai.py` |
+| copa(claude-haiku-4) API | `services/ai.py` |
 | 데이터 100개 이상 | 144개 (M1-1 계승) |
 | CRUD 4개 + summary | `/api/data` 5개 엔드포인트 |
 | 대화 3개 + 불러오기 | 저장·목록·상세·삭제 — (A)(B) 둘 다 충족 |
-| `/api/chat` 4단계 흐름 | 요약 조회 → 프롬프트 삽입 → GPT → 자동 저장 |
+| `/api/chat` 4단계 흐름 | 요약 조회 → 프롬프트 삽입 → copa → 자동 저장 |
 | Swagger `/docs` | FastAPI 자동 생성, 콜드스타트 안내 포함 |
 | 콜드스타트 대응 | 프론트 배너 + Swagger 설명 |
 | CORS·환경변수 | `ALLOWED_ORIGINS`, 키는 이름만 코드에 |
@@ -1049,7 +1071,7 @@ CSS 변수만 갈아 끼우는 방식이라 규칙을 두 번 쓰지 않습니�
 | Python 3.10 이상 | [python.org](https://www.python.org/downloads/) |
 | Git | [git-scm.com](https://git-scm.com/) |
 | 최신 브라우저 | Chrome·Edge·Safari |
-| OpenAI API 키 | AI 대화에만 필요. 없어도 나머지 기능은 동작합니다 |
+| copa API 키 | AI 대화에만 필요. 없어도 나머지 기능은 동작합니다 |
 | Firebase 프로젝트 | 배포에만 필요. 로컬은 자동으로 파일 저장소를 씁니다 |
 | OCI 서버 접속 권한 | 배포할 때만 |
 
@@ -1061,7 +1083,8 @@ CSS 변수만 갈아 끼우는 방식이라 규칙을 두 번 쓰지 않습니�
 |---|---|
 | **컨텍스트 주입** | AI 가 모르는 정보를 대화 시작 전에 글로 알려 주는 것 |
 | **시스템 프롬프트** | 대화 맨 앞에 놓여 AI 의 역할·지식·규칙을 정하는 지시문 |
-| **Function Calling** | AI 가 필요할 때 우리가 만든 함수를 부르도록 하는 기능 |
+| **tool use** | AI 가 필요할 때 우리가 만든 함수를 부르도록 하는 기능(Anthropic 규격) |
+| **copa** | 코드시세이 공식 게이트웨이. 기관 키로 정산되는 Anthropic/OpenAI 호환 API |
 | **CORS** | 다른 도메인의 요청을 브라우저가 허용할지 정하는 규칙 |
 | **Pydantic** | 파이썬에서 데이터 모양을 정의하고 검증하는 도구 |
 | **Firestore** | 구글의 문서형 데이터베이스. 컬렉션 안에 문서가 들어간다 |
@@ -1095,7 +1118,7 @@ CSS 변수만 갈아 끼우는 방식이라 규칙을 두 번 쓰지 않습니�
    기간이 함께 바뀝니다.
 6. **일부러 틀린 값을 넣어 봅니다.** `2026-02-30` 이나 음수 값을 넣으면 어느 필드가 왜
    틀렸는지 화면에 뜹니다(Pydantic 검증).
-7. **키를 넣고 대화합니다.** `.env` 에 `OPENAI_API_KEY` 를 채우고 서버를 재시작한 뒤
+7. **키를 넣고 대화합니다.** `.env` 에 `COPA_API_KEY` 를 채우고 서버를 재시작한 뒤
    "추세가 어때?" 라고 물어보세요. 답변 아래에 "데이터 요약 주입됨" 이 뜹니다.
 8. **도구 호출을 유도합니다.** "1960년 값만 보여 줘" 라고 물으면 하단에
    "도구 호출: get_data_points" 가 표시됩니다 — 요약에 없는 정보라 AI 가 데이터를
