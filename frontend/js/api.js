@@ -25,6 +25,39 @@ const TIMEOUT_MS = 70000;
 const COLD_START_HINT_MS = 4000;
 
 /**
+ * 실제 fetch + JSON 파싱. keep-alive 연결이 서버 타임아웃과 겹치면 uvicorn 이 요청을
+ * 파싱하기도 전에 평문 "Invalid HTTP request received."(400)를 돌려줄 때가 있다 —
+ * 그 응답은 connection: close 라 재시도는 새 연결을 쓴다. GET 은 부작용이 없어 한 번만
+ * 조용히 재시도하고, 쓰기 요청은 서버가 실제로 처리했을 수도 있어 재시도하지 않는다.
+ */
+async function fetchJson(path, options, signal, isRetry = false) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    ...options,
+  });
+
+  if (response.status === 204) return null; // 삭제 성공 — 본문이 없다
+
+  const text = await response.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (parseError) {
+    const method = (options.method || 'GET').toUpperCase();
+    if (method === 'GET' && !isRetry) {
+      return fetchJson(path, options, signal, true);
+    }
+    throw new Error('서버 응답을 해석하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+
+  if (!response.ok) {
+    throw new Error(describeError(response.status, data));
+  }
+  return data;
+}
+
+/**
  * fetch 한 겹 감싸기 — 타임아웃·JSON 파싱·오류 메시지를 한 곳에서 처리한다.
  * 실패는 Error 로 올리고, 화면 쪽이 사용자에게 보일 문장을 만든다.
  */
@@ -39,21 +72,7 @@ async function request(path, options = {}) {
   }, COLD_START_HINT_MS);
 
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      ...options,
-    });
-
-    if (response.status === 204) return null; // 삭제 성공 — 본문이 없다
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) {
-      throw new Error(describeError(response.status, data));
-    }
-    return data;
+    return await fetchJson(path, options, controller.signal);
   } catch (error) {
     if (error.name === 'AbortError') {
       throw new Error('응답이 너무 늦어 요청을 취소했습니다. 잠시 후 다시 시도해 주세요.');
